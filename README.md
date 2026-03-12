@@ -33,3 +33,32 @@ We selected **RoBERTa-base** because:
 - Efficient fine-tuning on modest hardware (e.g., Colab GPU)
 
 ## Project Structure
+```text
+ambiguity-detection-srs-roberta/
+│
+├── data/                      # Download dataset here (do NOT commit large files)
+│   └── raw/
+│       └── dataset.csv        # Place the Kaggle file here
+│
+├── notebooks/
+│   └── 01_exploration_and_training.ipynb   # Main notebook (start here)
+│
+├── src/
+│   ├── __init__.py
+│   ├── data_loader.py
+│   ├── preprocessor.py
+│   ├── model.py
+│   └── utils.py
+│
+├── scripts/
+│   ├── train.py               # CLI training
+│   └── predict.py             # Inference on new text
+│
+├── models/                    # Where trained model will be saved
+│   └── .gitkeep
+│
+├── requirements.txt
+├── .gitignore
+├── README.md
+└── LICENSE                    # MIT
+```
