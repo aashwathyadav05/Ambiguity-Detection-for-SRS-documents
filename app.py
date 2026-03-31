@@ -8,6 +8,7 @@ import torch
 import re
 from pathlib import Path
 from transformers import RobertaTokenizer, RobertaForSequenceClassification
+import pdfplumber
 
 # ─────────────────────────────────────────────
 #  Page config
@@ -199,7 +200,12 @@ BAR_COLORS = {
 }
 
 # ─────────────────────────────────────────────
-#  Rule-based heuristics (lightweight fallback)
+#  Model path (hardcoded)
+# ─────────────────────────────────────────────
+MODEL_PATH = "models/roberta-ambiguity-final"
+
+
+# ─────────────────────────────────────────────
 # ─────────────────────────────────────────────
 VAGUE_WORDS     = ["adequate", "appropriate", "fast", "flexible", "high", "large",
                    "maximize", "minimize", "optimal", "quick", "recent", "robust",
@@ -274,12 +280,6 @@ with st.sidebar:
     st.markdown("## ⚙️ Configuration")
     st.markdown("---")
 
-    model_path = st.text_input(
-        "Model directory path",
-        value="models/roberta-srs-ambiguity",
-        help="Local path where your fine-tuned RoBERTa model is saved."
-    )
-
     confidence_threshold = st.slider(
         "Confidence threshold", 0.0, 1.0, 0.5, 0.05,
         help="Predictions below this confidence will be flagged with a warning."
@@ -322,18 +322,17 @@ st.markdown("""
 model_loaded = False
 tokenizer, model = None, None
 
-if Path(model_path).exists():
+if Path(MODEL_PATH).exists():
     with st.spinner("Loading model…"):
         try:
-            tokenizer, model = load_model(model_path)
+            tokenizer, model = load_model(MODEL_PATH)
             model_loaded = True
-            st.success(f"✅ Model loaded from `{model_path}`", icon="🤖")
+            st.success(f"✅ Model loaded from `{MODEL_PATH}`", icon="🤖")
         except Exception as e:
             st.error(f"Failed to load model: {e}")
 else:
     st.warning(
-        f"⚠️ Model not found at `{model_path}`. "
-        "Please update the path in the sidebar. "
+        f"⚠️ Model not found at `{MODEL_PATH}`. "
         "Rule-based heuristics are still available below.",
         icon="📂",
     )
@@ -466,11 +465,21 @@ with tab_bulk:
 
 # ── Tab 3: File upload ───────────────────────
 with tab_file:
-    st.markdown("#### Upload an SRS document (`.txt`)")
-    uploaded = st.file_uploader("Choose a .txt file", type=["txt"])
+    st.markdown("#### Upload an SRS document (`.txt` or `.pdf`)")
+    uploaded = st.file_uploader("Choose a file", type=["txt", "pdf"])
 
     if uploaded is not None:
-        raw_text = uploaded.read().decode("utf-8", errors="ignore")
+        # Extract text based on file type
+        if uploaded.type == "application/pdf":
+            with st.spinner("Extracting text from PDF…"):
+                pdf_text = ""
+                with pdfplumber.open(uploaded) as pdf:
+                    for page in pdf.pages:
+                        pdf_text += page.extract_text() or ""
+                raw_text = pdf_text
+        else:
+            raw_text = uploaded.read().decode("utf-8", errors="ignore")
+        
         sentences = split_sentences(raw_text)
         st.info(f"Extracted **{len(sentences)} sentences** from `{uploaded.name}`.")
 
