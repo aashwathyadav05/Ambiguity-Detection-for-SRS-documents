@@ -6,9 +6,16 @@ Streamlit Demo App — powered by fine-tuned RoBERTa
 import streamlit as st
 import torch
 import re
+import sys
 from pathlib import Path
-from transformers import RobertaTokenizer, RobertaForSequenceClassification
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import pdfplumber
+
+# Add project root to python path to resolve src imports
+PROJECT_ROOT = Path(__file__).parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(PROJECT_ROOT))
+from src.utils import rule_based_ambiguity
 
 # ─────────────────────────────────────────────
 #  Page config
@@ -198,48 +205,12 @@ MODEL_PATH = "models/roberta-ambiguity-final"
 
 
 # ─────────────────────────────────────────────
-# ─────────────────────────────────────────────
-VAGUE_WORDS     = ["adequate", "appropriate", "fast", "flexible", "high", "large",
-                   "maximize", "minimize", "optimal", "quick", "recent", "robust",
-                   "simple", "small", "sufficient", "user-friendly", "various",
-                   "several", "many", "easy", "efficient", "modern", "normal"]
-MODAL_VERBS     = ["may", "might", "could", "should", "shall", "must", "will",
-                   "would", "can"]
-PRONOUNS        = ["it", "they", "them", "this", "that", "these", "those",
-                   "its", "their"]
-PASSIVE_RE      = re.compile(
-    r'\b(is|are|was|were|be|been|being)\s+\w+ed\b', re.I
-)
-ATTACHMENT_RE   = re.compile(
-    r'\b(with|that|which|who|where)\b.*\b(and|or)\b', re.I
-)
-
-def rule_based_flags(sentence: str) -> list[str]:
-    s = sentence.lower()
-    flags = []
-    found_vague = [w for w in VAGUE_WORDS if re.search(rf'\b{w}\b', s)]
-    if found_vague:
-        flags.append(f"Vague quantifier(s): *{', '.join(found_vague)}*")
-    found_modals = [w for w in MODAL_VERBS if re.search(rf'\b{w}\b', s)]
-    if found_modals:
-        flags.append(f"Ambiguous modal verb(s): *{', '.join(found_modals)}*")
-    found_pro = [w for w in PRONOUNS if re.search(rf'\b{w}\b', s)]
-    if found_pro:
-        flags.append(f"Unclear pronoun reference(s): *{', '.join(found_pro)}*")
-    if PASSIVE_RE.search(sentence):
-        flags.append("Passive voice detected — actor unspecified.")
-    if ATTACHMENT_RE.search(sentence):
-        flags.append("Possible modifier attachment ambiguity.")
-    return flags
-
-
-# ─────────────────────────────────────────────
 #  Model loading
 # ─────────────────────────────────────────────
 @st.cache_resource(show_spinner=False)
 def load_model(model_path: str):
-    tokenizer = RobertaTokenizer.from_pretrained(model_path)
-    model     = RobertaForSequenceClassification.from_pretrained(model_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
+    model     = AutoModelForSequenceClassification.from_pretrained(model_path)
     model.eval()
     return tokenizer, model
 
@@ -338,12 +309,12 @@ if uploaded is not None:
         results = []
         prog = st.progress(0, text="Analyzing…")
         for i, sent in enumerate(to_analyze):
+            rule_cls, rule_flags = rule_based_ambiguity(sent) if show_rules else ("Clean", [])
             if model_loaded:
                 label, conf, all_probs = predict_sentence(sent, tokenizer, model)
             else:
                 label, conf, all_probs = "N/A", 0.0, {k: 0.0 for k in LABEL_NAMES.values()}
-            flags = rule_based_flags(sent) if show_rules else []
-            results.append((sent, label, conf, flags, all_probs))
+            results.append((sent, label, conf, rule_flags, all_probs, rule_cls))
             prog.progress((i + 1) / len(to_analyze))
         prog.empty()
 
@@ -364,26 +335,33 @@ if uploaded is not None:
             st.markdown("")
 
         st.markdown("### Sentence-level Results")
-        for sent, label, conf, flags, all_probs in results:
+        for sent, label, conf, flags, all_probs, rule_cls in results:
             css_cls = LABEL_CSS.get(label, "clean")
             bar_clr = BAR_COLORS.get(label, "#94a3b8")
-            if label != "Clean":
-                with st.expander(f"[{label}]  {sent[:90]}{'…' if len(sent)>90 else ''}", expanded=True):
+            if label != "Clean" or rule_cls != "Clean":
+                with st.expander(f"[Model: {label} | Rule: {rule_cls}]  {sent[:85]}{'…' if len(sent)>85 else ''}", expanded=True):
                     st.markdown(f"""
                     <div class="result-card result-{css_cls}">
-                      <div class="result-label">{label}</div>
+                      <div class="result-label">Model Prediction: {label}</div>
                       <div class="result-text">{sent}</div>
                       <div class="confidence-bar-bg"><div class="confidence-bar-fill" style="width:{conf*100:.1f}%;background:{bar_clr};"></div></div>
-                      <div style="font-family:'IBM Plex Mono',monospace;font-size:0.75rem;margin-top:4px;opacity:0.7;">Confidence: {conf*100:.1f}%</div>
+                      <div style="font-family:'IBM Plex Mono',monospace;font-size:0.75rem;margin-top:4px;opacity:0.7;">Model Confidence: {conf*100:.1f}%</div>
                     </div>
                     """, unsafe_allow_html=True)
-                    st.markdown("**Probability distribution**")
-                    for lbl, p in sorted(all_probs.items(), key=lambda x: -x[1]):
-                        st.progress(p, text=f"{lbl}: {p*100:.1f}%")
-                    if flags:
-                        st.markdown("**Heuristic hints:**")
-                        for f in flags:
-                            st.markdown(f"- {f}")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.markdown("**Model Probability Distribution**")
+                        for lbl, p in sorted(all_probs.items(), key=lambda x: -x[1]):
+                            st.progress(p, text=f"{lbl}: {p*100:.1f}%")
+                            
+                    with col2:
+                        st.markdown(f"**Rule-based Engine (Class: {rule_cls})**")
+                        if flags:
+                            for f in flags:
+                                st.markdown(f"- {f}")
+                        else:
+                            st.markdown("- No heuristic flags detected")
             else:
                 with st.expander(f"[Clean]  {sent[:90]}{'…' if len(sent)>90 else ''}", expanded=False):
                     st.markdown(f"_{sent}_")

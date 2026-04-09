@@ -28,23 +28,39 @@ def main():
     inverse_map = {v: k for k, v in LABEL_MAP.items()}
 
     def predict_one(text: str):
-        rule = rule_based_ambiguity(text)
-        if rule != "Clean":
-            return rule
+        rule_class, rule_flags = rule_based_ambiguity(text)
 
         inputs = model_obj.tokenizer(text, return_tensors="pt", truncation=True, max_length=128)
         with torch.no_grad():
             outputs = model_obj.model(**inputs)
-        pred = outputs.logits.argmax(-1).item()
-        return inverse_map.get(pred, "Unknown")
+            
+        probs = torch.softmax(outputs.logits, dim=-1).squeeze().tolist()
+        pred_idx = int(torch.argmax(outputs.logits))
+        model_conf = probs[pred_idx]
+        model_pred = inverse_map.get(pred_idx, "Unknown")
+        
+        return {
+            "text": text,
+            "rule_class": rule_class,
+            "rule_flags": rule_flags,
+            "model_pred": model_pred,
+            "model_conf": model_conf,
+            "all_probs": {inverse_map.get(i, f"Label_{i}"): p for i, p in enumerate(probs)}
+        }
 
     if args.text:
-        result = predict_one(args.text)
-        print(f"Text: {args.text}")
-        print(f"Predicted: {result}")
+        res = predict_one(args.text)
+        print(f"Text: {res['text']}")
+        print(f"Rule-Based Prediction: {res['rule_class']}")
+        print(f"Rule Flags: {res['rule_flags']}")
+        print(f"Model-Based Prediction: {res['model_pred']} (Conf: {res['model_conf']:.2f})")
+        print("Model Probability Distribution:")
+        for k, v in sorted(res['all_probs'].items(), key=lambda x: -x[1]):
+            print(f"  {k}: {v:.2f}")
     elif args.file:
         df = pd.read_csv(args.file)
-        df['predicted'] = df['text'].apply(predict_one)
+        results = df['text'].apply(predict_one).apply(pd.Series)
+        df = pd.concat([df, results.drop('text', axis=1)], axis=1)
         df.to_csv("predictions.csv", index=False)
         print(f"Predictions saved to predictions.csv ({len(df)} rows)")
 

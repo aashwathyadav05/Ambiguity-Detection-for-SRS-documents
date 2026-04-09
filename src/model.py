@@ -1,4 +1,4 @@
-from transformers import RobertaForSequenceClassification, RobertaConfig
+from transformers import AutoModelForSequenceClassification, AutoConfig
 from .preprocessor import get_tokenizer
 
 LABEL_MAP = {
@@ -15,8 +15,8 @@ LABEL_MAP = {
 class AmbiguityRoBERTa:
     def __init__(self, model_name: str = "roberta-base", num_labels: int = 6):
         self.tokenizer = get_tokenizer(model_name)
-        config = RobertaConfig.from_pretrained(model_name, num_labels=num_labels)
-        self.model = RobertaForSequenceClassification.from_pretrained(model_name, config=config)
+        config = AutoConfig.from_pretrained(model_name, num_labels=num_labels)
+        self.model = AutoModelForSequenceClassification.from_pretrained(model_name, config=config)
 
     def save(self, path: str):
         self.model.save_pretrained(path)
