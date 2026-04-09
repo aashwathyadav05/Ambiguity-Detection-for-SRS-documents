@@ -1,4 +1,4 @@
-﻿"""
+"""
 Ambiguity Detection for SRS Documents
 Streamlit Demo App — powered by fine-tuned RoBERTa
 """
@@ -15,7 +15,6 @@ import pdfplumber
 # ─────────────────────────────────────────────
 st.set_page_config(
     page_title="SRS Ambiguity Detector",
-    page_icon="🔍",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -33,30 +32,32 @@ html, body, [class*="css"] {
 
 /* Hero header */
 .hero {
-    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #0f172a 100%);
-    padding: 2.5rem 2rem 2rem 2rem;
-    border-radius: 16px;
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    padding: 2rem 2.5rem;
+    border-radius: 8px;
     margin-bottom: 2rem;
-    border: 1px solid #1e40af33;
+    border: 1px solid #334155;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 .hero h1 {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 2rem;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 2.2rem;
     font-weight: 600;
-    color: #e2e8f0;
-    margin: 0 0 0.4rem 0;
-    letter-spacing: -0.5px;
+    color: #f8fafc;
+    margin: 0 0 0.5rem 0;
+    letter-spacing: -0.02em;
 }
 .hero p {
     color: #94a3b8;
-    font-size: 0.95rem;
+    font-size: 1.05rem;
     margin: 0;
+    line-height: 1.5;
 }
 .hero .badge {
     display: inline-block;
-    background: #1e40af44;
-    border: 1px solid #3b82f6;
-    color: #93c5fd;
+    background: #334155;
+    border: 1px solid #475569;
+    color: #cbd5e1;
     font-family: 'IBM Plex Mono', monospace;
     font-size: 0.72rem;
     padding: 2px 10px;
@@ -172,15 +173,6 @@ LABEL_CSS = {
     "Clean":      "clean",
 }
 
-LABEL_EMOJI = {
-    "Lexical":   "🔤",
-    "Syntactic": "🧩",
-    "Semantic":  "💬",
-    "Syntax":    "📐",
-    "Pragmatic": "🗣️",
-    "Clean":     "✅",
-}
-
 LABEL_DESC = {
     "Lexical":   "A word has multiple meanings (e.g., 'process', 'handle', 'light').",
     "Syntactic": "Sentence structure allows multiple parse trees.",
@@ -277,16 +269,16 @@ def split_sentences(text: str) -> list[str]:
 # ─────────────────────────────────────────────
 st.markdown("""
 <div class="hero">
-  <h1>🔍 SRS Ambiguity Detector</h1>
+  <h1>SRS Ambiguity Detector</h1>
   <p>Automatically classify linguistic ambiguities in Software Requirements Specification documents.</p>
 </div>
 """, unsafe_allow_html=True)
 # ─────────────────────────────────────────────
 #  Label Guide (front)
 # ─────────────────────────────────────────────
-st.markdown("### 📋 Label Guide")
+st.markdown("### Label Guide")
 for lbl, desc in LABEL_DESC.items():
-    st.markdown(f"**{LABEL_EMOJI[lbl]} {lbl}**  \n{desc}")
+    st.markdown(f"**{lbl}**  \n{desc}")
 
 # Always show rule-based hints and full probability distribution
 show_rules = True
@@ -308,14 +300,13 @@ if Path(MODEL_PATH).exists():
         try:
             tokenizer, model = load_model(MODEL_PATH)
             model_loaded = True
-            st.success(f"✅ Model loaded from `{MODEL_PATH}`", icon="🤖")
+            st.success(f"Model loaded from `{MODEL_PATH}`")
         except Exception as e:
             st.error(f"Failed to load model: {e}")
 else:
     st.warning(
-        f"⚠️ Model not found at `{MODEL_PATH}`. "
-        "Rule-based heuristics are still available below.",
-        icon="📂",
+        f"Model not found at `{MODEL_PATH}`. "
+        "Rule-based heuristics are still available below."
     )
 
 
@@ -359,28 +350,28 @@ if uploaded is not None:
         if model_loaded:
             from collections import Counter
             counts = Counter(r[1] for r in results)
-            st.markdown("### 📊 Document Summary")
+            st.markdown("### Document Summary")
             cols = st.columns(len(LABEL_NAMES))
             for j, (idx, lbl) in enumerate(LABEL_NAMES.items()):
                 c = counts.get(lbl, 0)
                 cols[j].markdown(
                     f'<div class="metric-box">'
                     f'<div class="value" style="color:{BAR_COLORS[lbl]}">{c}</div>'
-                    f'<div class="label">{LABEL_EMOJI[lbl]} {lbl}</div>'
+                    f'<div class="label">{lbl}</div>'
                     f'</div>',
                     unsafe_allow_html=True
                 )
             st.markdown("")
 
-        st.markdown("### 📋 Sentence-level Results")
+        st.markdown("### Sentence-level Results")
         for sent, label, conf, flags, all_probs in results:
             css_cls = LABEL_CSS.get(label, "clean")
             bar_clr = BAR_COLORS.get(label, "#94a3b8")
             if label != "Clean":
-                with st.expander(f"{LABEL_EMOJI.get(label,'🔍')} [{label}]  {sent[:90]}{'…' if len(sent)>90 else ''}", expanded=True):
+                with st.expander(f"[{label}]  {sent[:90]}{'…' if len(sent)>90 else ''}", expanded=True):
                     st.markdown(f"""
                     <div class="result-card result-{css_cls}">
-                      <div class="result-label">{LABEL_EMOJI.get(label,'🔍')} {label}</div>
+                      <div class="result-label">{label}</div>
                       <div class="result-text">{sent}</div>
                       <div class="confidence-bar-bg"><div class="confidence-bar-fill" style="width:{conf*100:.1f}%;background:{bar_clr};"></div></div>
                       <div style="font-family:'IBM Plex Mono',monospace;font-size:0.75rem;margin-top:4px;opacity:0.7;">Confidence: {conf*100:.1f}%</div>
@@ -388,13 +379,13 @@ if uploaded is not None:
                     """, unsafe_allow_html=True)
                     st.markdown("**Probability distribution**")
                     for lbl, p in sorted(all_probs.items(), key=lambda x: -x[1]):
-                        st.progress(p, text=f"{LABEL_EMOJI[lbl]} {lbl}: {p*100:.1f}%")
+                        st.progress(p, text=f"{lbl}: {p*100:.1f}%")
                     if flags:
-                        st.markdown("**🔎 Heuristic hints:**")
+                        st.markdown("**Heuristic hints:**")
                         for f in flags:
                             st.markdown(f"- {f}")
             else:
-                with st.expander(f"✅ [Clean]  {sent[:90]}{'…' if len(sent)>90 else ''}", expanded=False):
+                with st.expander(f"[Clean]  {sent[:90]}{'…' if len(sent)>90 else ''}", expanded=False):
                     st.markdown(f"_{sent}_")
 
 
