@@ -209,6 +209,7 @@ MODEL_PATH = "models/roberta-ambiguity-final"
 # ─────────────────────────────────────────────
 @st.cache_resource(show_spinner=False)
 def load_model(model_path: str):
+    # Using Auto classes (best practice), but our project is still built on the RoBERTa architecture
     tokenizer = AutoTokenizer.from_pretrained(model_path)
     model     = AutoModelForSequenceClassification.from_pretrained(model_path)
     model.eval()
