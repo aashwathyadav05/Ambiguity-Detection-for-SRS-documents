@@ -5,6 +5,8 @@ Fine-tuned **RoBERTa** model identifies linguistic ambiguities that can lead to 
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org/)
 [![Transformers](https://img.shields.io/badge/HuggingFace-Transformers-orange)](https://huggingface.co/docs/transformers/index)
+[![React](https://img.shields.io/badge/React-19-blue)](https://react.dev/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.104%2B-009688)](https://fastapi.tiangolo.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Overview
@@ -24,6 +26,88 @@ This project builds an **ambiguity detection system** that:
 
 **Primary Dataset**: [Fault-prone SRS Dataset](https://www.kaggle.com/datasets/corpus4panwo/fault-prone-srs-dataset) (~7,061 labeled requirements from ~200 publicly collected SRS documents, as described in the 2023 MDPI paper).
 
+## Architecture
+
+| Layer | Technology | Details |
+|-------|-----------|---------|
+| Frontend | React + Vite | Modern UI with drag-and-drop file upload, interactive result cards |
+| Backend | FastAPI | REST API serving the RoBERTa model + rule-based engine |
+| ML Model | RoBERTa (HuggingFace) | Fine-tuned on SRS ambiguity dataset, 6-class classification |
+
+## Project Structure
+
+```text
+Ambiguity-Detection-for-SRS-documents/
+│
+├── backend/                   # FastAPI backend
+│   ├── main.py                # API endpoints (health, labels, analyze)
+│   └── requirements.txt       # Backend Python dependencies
+│
+├── frontend/                  # React + Vite frontend
+│   ├── src/
+│   │   ├── App.jsx            # Main application
+│   │   ├── components/        # Hero, LabelGuide, FileUpload, etc.
+│   │   └── api/client.js      # API client
+│   ├── index.html
+│   └── package.json
+│
+├── src/                       # ML modules (shared by backend & scripts)
+│   ├── data_loader.py
+│   ├── preprocessor.py
+│   ├── model.py
+│   └── utils.py
+│
+├── scripts/
+│   ├── train.py               # CLI training
+│   └── predict.py             # CLI inference
+│
+├── models/                    # Trained model weights (git-ignored)
+│   └── roberta-ambiguity-final/
+│
+├── data/
+│   └── dataset.csv            # Training dataset
+│
+├── notebooks/
+│   └── 01_exploration_and_training.ipynb
+│
+├── requirements.txt           # Training/notebook dependencies
+├── app.py                     # Legacy Streamlit app (reference only)
+└── README.md
+```
+
+## Quick Start
+
+### 1. Backend
+
+```bash
+# Install backend dependencies (from project root)
+pip install -r backend/requirements.txt
+
+# Start the FastAPI server
+uvicorn backend.main:app --reload
+# Server runs at http://localhost:8000
+```
+
+### 2. Frontend
+
+```bash
+# Install frontend dependencies
+cd frontend
+npm install
+
+# Start the dev server
+npm run dev
+# App runs at http://localhost:5173
+```
+
+### 3. Use the app
+
+1. Open `http://localhost:5173` in your browser
+2. Upload a `.txt` or `.pdf` SRS document
+3. Adjust the max sentences slider
+4. Click **Analyze Document**
+5. View sentence-level results with model predictions, confidence scores, and rule-based flags
+
 ## Model Choice: Why RoBERTa?
 
 We selected **RoBERTa-base** because:
@@ -32,32 +116,14 @@ We selected **RoBERTa-base** because:
 - Proven in similar requirements engineering / NLP4RE tasks (ambiguity, anaphora, defect detection)
 - Efficient fine-tuning on modest hardware (e.g., Colab GPU)
 
-## Project Structure
-```text
-ambiguity-detection-srs-roberta/
-│
-├── data/                      # Download dataset here 
-│       └── dataset.csv   
-│
-├── notebooks/
-│   └── 01_exploration_and_training.ipynb   # Main notebook (start here)
-│
-├── src/
-│   ├── __init__.py
-│   ├── data_loader.py
-│   ├── preprocessor.py
-│   ├── model.py
-│   └── utils.py
-│
-├── scripts/
-│   ├── train.py               # CLI training
-│   └── predict.py             # Inference on new text
-│
-├── models/                    # Where trained model will be saved
-│   └── .gitkeep
-│
-├── requirements.txt
-├── .gitignore
-├── README.md
-└── LICENSE                    # MIT
-```
+## API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/health` | GET | Health check + model status |
+| `/api/labels` | GET | Label metadata (names, descriptions, colors) |
+| `/api/analyze` | POST | Upload & analyze a document (multipart form) |
+
+## License
+
+MIT
